@@ -1,0 +1,3 @@
+module LUMINOCITY_FRONTEND
+
+go 1.20
