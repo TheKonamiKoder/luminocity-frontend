@@ -4,8 +4,7 @@ type SensorType int
 
 const (
 	LIGHT_SENSOR = iota
-	TEMPERATURE_SENSOR
-	HUMIDITY_SENSOR
+	DHT11_SENSOR
 	MOTION_SENSOR
 )
 
@@ -18,16 +17,15 @@ func (l LightSensorData) GetVal() interface{} {
 	return l.Val
 }
 
-type TemperatureSensorData struct{ Val float32 }
-
-func (t TemperatureSensorData) GetVal() interface{} {
-	return t.Val
+type DHT11SensorData struct {
+	Val struct {
+		Temperature float32
+		Humidity    float32
+	}
 }
 
-type HumiditySensorData struct{ Val float32 }
-
-func (h HumiditySensorData) GetVal() interface{} {
-	return h.Val
+func (d DHT11SensorData) GetVal() interface{} {
+	return d.Val
 }
 
 type MotionSensorData struct{ Val bool }
