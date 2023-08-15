@@ -17,11 +17,13 @@ func (l LightSensorData) GetVal() interface{} {
 	return l.Val
 }
 
+type DHT11SensorDataVal struct {
+	Temperature float32
+	Humidity    float32
+}
+
 type DHT11SensorData struct {
-	Val struct {
-		Temperature float32
-		Humidity    float32
-	}
+	Val DHT11SensorDataVal
 }
 
 func (d DHT11SensorData) GetVal() interface{} {

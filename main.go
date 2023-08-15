@@ -40,6 +40,27 @@ func main() {
 			Type: LIGHT_SENSOR,
 			Data: LightSensorData{Val: 50},
 		},
+		{
+			Id:   3,
+			Name: "Loft",
+			Room: "Loft",
+			Type: DHT11_SENSOR,
+			Data: DHT11SensorData{Val: DHT11SensorDataVal{38, 80}},
+		},
+		{
+			Id:   4,
+			Name: "Basement",
+			Room: "Basement",
+			Type: DHT11_SENSOR,
+			Data: DHT11SensorData{Val: DHT11SensorDataVal{0, 12}},
+		},
+		{
+			Id:   5,
+			Name: "Sun",
+			Room: "Outside",
+			Type: DHT11_SENSOR,
+			Data: DHT11SensorData{Val: DHT11SensorDataVal{50, 90}},
+		},
 	}
 
 	LIST_ITEM_HEIGHT := 100
@@ -48,11 +69,11 @@ func main() {
 			return len(sensors)
 		},
 		func() fyne.CanvasObject {
-			r := canvas.NewRectangle(color.Black)
+			template_co := canvas.NewRectangle(color.Black)
 
-			r.SetMinSize(fyne.NewSize(1, LIST_ITEM_HEIGHT))
+			template_co.SetMinSize(fyne.NewSize(1, LIST_ITEM_HEIGHT))
 
-			return container.NewMax(r)
+			return container.NewMax(template_co)
 
 			//return sco
 		},
@@ -84,6 +105,8 @@ func newSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 	switch sensor.Type {
 	case LIGHT_SENSOR:
 		return newLightSensorCavasObject(sensor)
+	case DHT11_SENSOR:
+		return newDHT11SensorCanvasObject(sensor)
 	default:
 		return widget.NewLabel("Template")
 	}
@@ -109,12 +132,12 @@ func newLightSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 		color.White,
 	)
 
-	visual_light_sensor := container.NewMax(
+	light_co := container.NewMax(
 		container.NewBorder(
 			container.NewMax(
 				container.NewBorder(
 					nil, nil,
-					widget.NewLabel(sensor.Name+" (Light Sensor)"),
+					widget.NewLabel(sensor.Name+" (Light)"),
 					widget.NewButtonWithIcon(
 						"",
 						theme.MenuIcon(),
@@ -128,5 +151,89 @@ func newLightSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 		),
 	)
 
-	return visual_light_sensor
+	return light_co
+}
+
+func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
+
+	temperature := sensor.Data.(DHT11SensorData).Val.Temperature
+
+	temperature_color_indication := canvas.NewRectangle(
+		func() color.Color {
+			BASE := uint8(100)
+
+			RED_CUTOFF := float32(25)
+			MAX_TEMP := float32(60) // All float32 to avoid MismatchedTypes
+			MIN_TEMP := float32(-20)
+
+			if temperature >= float32(RED_CUTOFF) {
+				temp_percent := (temperature - RED_CUTOFF) / (MAX_TEMP - RED_CUTOFF)
+				return color.NRGBA{
+					R: 255,
+					G: BASE - uint8((1-temp_percent)*(MAX_TEMP-RED_CUTOFF)),
+					B: BASE - uint8((1-temp_percent)*(MAX_TEMP-RED_CUTOFF)),
+					A: 255,
+				}
+			} else {
+				temp_percent := (RED_CUTOFF - temperature) / (RED_CUTOFF - MIN_TEMP)
+				return color.NRGBA{
+					R: BASE - uint8(temp_percent*(MAX_TEMP-RED_CUTOFF)),
+					G: BASE - uint8(temp_percent*(MAX_TEMP-RED_CUTOFF)),
+					B: 255,
+					A: 255,
+				}
+			}
+		}(),
+	)
+
+	temperature_text_indication := canvas.NewText(
+		strconv.FormatFloat(float64(temperature), 'f', 2, 64)+"°C",
+		color.White,
+	)
+
+	humidity := sensor.Data.(DHT11SensorData).Val.Humidity
+
+	humidity_color_indication := canvas.NewRectangle(
+		color.NRGBA{
+			R: 5,
+			G: 238,
+			B: 255,
+			A: 255,
+		},
+	)
+
+	humidity_text_indication := canvas.NewText(
+		strconv.FormatFloat(float64(humidity), 'f', 2, 64)+"%",
+		color.White,
+	)
+
+	dht11_co := container.NewMax(
+		container.NewBorder(
+			container.NewMax(
+				container.NewBorder(
+					nil, nil,
+					widget.NewLabel(sensor.Name+" (DHT11)"),
+					widget.NewButtonWithIcon(
+						"",
+						theme.MenuIcon(),
+						func() {}, // TODO: Show option to see log and analytics
+					),
+				),
+			),
+			nil, nil, nil,
+			container.NewGridWithColumns(
+				2,
+				container.NewMax(
+					temperature_color_indication,
+					container.NewCenter(temperature_text_indication),
+				),
+				container.NewMax(
+					humidity_color_indication,
+					container.NewCenter(humidity_text_indication),
+				),
+			),
+		),
+	)
+
+	return dht11_co
 }
