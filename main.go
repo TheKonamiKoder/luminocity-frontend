@@ -61,6 +61,20 @@ func main() {
 			Type: DHT11_SENSOR,
 			Data: DHT11SensorData{Val: DHT11SensorDataVal{50, 90}},
 		},
+		{
+			Id:   6,
+			Name: "Front door",
+			Room: "Outside",
+			Type: MOTION_SENSOR,
+			Data: MotionSensorData{Val: true},
+		},
+		{
+			Id:   7,
+			Name: "Back door",
+			Room: "Garden",
+			Type: MOTION_SENSOR,
+			Data: MotionSensorData{Val: false},
+		},
 	}
 
 	LIST_ITEM_HEIGHT := 100
@@ -107,6 +121,8 @@ func newSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 		return newLightSensorCavasObject(sensor)
 	case DHT11_SENSOR:
 		return newDHT11SensorCanvasObject(sensor)
+	case MOTION_SENSOR:
+		return newMotionSensorCanvasObject(sensor)
 	default:
 		return widget.NewLabel("Template")
 	}
@@ -126,39 +142,25 @@ func newLightSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 
 	color_indication.SetMinSize(fyne.NewSize(1, 50))
 
-	// The text to show the actual value of the sensor, so it is easy to read
 	sensor_value := canvas.NewText(
 		strconv.Itoa(int(sensor.Data.GetVal().(uint8))),
 		color.White,
 	)
 
 	light_co := container.NewMax(
-		container.NewBorder(
-			container.NewMax(
-				container.NewBorder(
-					nil, nil,
-					widget.NewLabel(sensor.Name+" (Light)"),
-					widget.NewButtonWithIcon(
-						"",
-						theme.MenuIcon(),
-						func() {}, // TODO: Show option to see log and analytics
-					),
-				),
-			),
-			nil, nil, nil,
-			color_indication,
-			container.NewCenter(sensor_value),
-		),
+		color_indication,
+		container.NewCenter(sensor_value),
 	)
 
-	return light_co
+	return newFinalSensorCanvasObject(sensor, light_co)
 }
 
 func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 
-	temperature := sensor.Data.(DHT11SensorData).Val.Temperature
+	temperature := sensor.Data.GetVal().(DHT11SensorDataVal).Temperature
 
 	temperature_color_indication := canvas.NewRectangle(
+		// The color changes from red (if it is above 25) or blue (below 25) to show hot and cold.
 		func() color.Color {
 			BASE := uint8(100)
 
@@ -191,8 +193,9 @@ func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 		color.White,
 	)
 
-	humidity := sensor.Data.(DHT11SensorData).Val.Humidity
+	humidity := sensor.Data.GetVal().(DHT11SensorDataVal).Humidity
 
+	// Just a standard thingy...
 	humidity_color_indication := canvas.NewRectangle(
 		color.NRGBA{
 			R: 5,
@@ -207,12 +210,88 @@ func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 		color.White,
 	)
 
-	dht11_co := container.NewMax(
+	dht11_co := container.NewGridWithColumns(
+		2,
+		container.NewMax(
+			temperature_color_indication,
+			container.NewCenter(temperature_text_indication),
+		),
+		container.NewMax(
+			humidity_color_indication,
+			container.NewCenter(humidity_text_indication),
+		),
+	)
+
+	return newFinalSensorCanvasObject(sensor, dht11_co)
+}
+
+func newMotionSensorCanvasObject(sensor Sensor) fyne.CanvasObject {
+
+	movement := sensor.Data.GetVal().(bool)
+
+	color_indication := canvas.NewRectangle(
+		// Displays green if there is no movement and red if there is movement
+		func() color.Color {
+			if !movement {
+				return color.NRGBA{
+					R: 76,
+					G: 235,
+					B: 52,
+					A: 255,
+				}
+			} else {
+				return color.NRGBA{
+					R: 235,
+					G: 76,
+					B: 52,
+					A: 255,
+				}
+			}
+		}(),
+	)
+
+	text_indication := canvas.NewText(
+		func() string {
+			if !movement {
+				return "NO MOVEMENT DETECTED"
+			} else {
+				return "MOVEMENT DETECTED"
+			}
+		}(),
+		color.White,
+	)
+
+	motion_co := container.NewMax(
+		color_indication,
+		container.NewCenter(text_indication),
+	)
+
+	return newFinalSensorCanvasObject(sensor, motion_co)
+
+}
+
+// Wraps the main part of the sensor in the repetitive part
+func newFinalSensorCanvasObject(sensor Sensor, sensor_co fyne.CanvasObject) fyne.CanvasObject {
+
+	sensor_type_name := func() string {
+		switch sensor.Type {
+		case LIGHT_SENSOR:
+			return "Light"
+		case DHT11_SENSOR:
+			return "DHT11"
+		case MOTION_SENSOR:
+			return "Motion"
+		default:
+			return "Unknown"
+		}
+	}()
+
+	final_co := container.NewMax(
 		container.NewBorder(
 			container.NewMax(
 				container.NewBorder(
 					nil, nil,
-					widget.NewLabel(sensor.Name+" (DHT11)"),
+					widget.NewLabel(sensor.Name+" ("+sensor_type_name+")"),
 					widget.NewButtonWithIcon(
 						"",
 						theme.MenuIcon(),
@@ -221,19 +300,9 @@ func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 				),
 			),
 			nil, nil, nil,
-			container.NewGridWithColumns(
-				2,
-				container.NewMax(
-					temperature_color_indication,
-					container.NewCenter(temperature_text_indication),
-				),
-				container.NewMax(
-					humidity_color_indication,
-					container.NewCenter(humidity_text_indication),
-				),
-			),
+			sensor_co,
 		),
 	)
 
-	return dht11_co
+	return final_co
 }
