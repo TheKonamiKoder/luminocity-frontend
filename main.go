@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"sort"
 	"strconv"
 
 	"fyne.io/fyne"
@@ -77,38 +78,88 @@ func main() {
 		},
 	}
 
+	//* Map with the name of the room and the list of sensors the room has
+	house := make(map[string][]Sensor)
+
+	var sensor Sensor
+	for i := 0; i < len(sensors); i++ {
+		sensor = sensors[i]
+
+		sensors_in_room, room_exists := house[sensor.Room]
+
+		if !room_exists {
+			house[sensor.Room] = []Sensor{sensor}
+			continue
+		}
+
+		house[sensor.Room] = append(sensors_in_room, sensor)
+	}
+
 	LIST_ITEM_HEIGHT := 100
-	sensor_displays := widget.NewList(
+
+	rooms := make([]string, 0, len(house))
+	for r := range house {
+		rooms = append(rooms, r)
+	}
+	sort.Strings(rooms)
+	current_sensors := house[rooms[0]]
+
+	sensor_listbox := widget.NewList(
 		func() int {
-			return len(sensors)
+			return len(current_sensors)
 		},
 		func() fyne.CanvasObject {
 			template_co := canvas.NewRectangle(color.Black)
-
 			template_co.SetMinSize(fyne.NewSize(1, LIST_ITEM_HEIGHT))
 
 			return container.NewMax(template_co)
-
-			//return sco
 		},
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
 			c := co.(*fyne.Container)
-			c.Objects[0] = newSensorCavasObject(sensors[lii])
+			c.Objects[0] = newSensorCavasObject(current_sensors[lii])
+		},
+	)
+
+	room_listbox := widget.NewList(
+		func() int {
+			return len(rooms)
+		},
+		func() fyne.CanvasObject {
+			return widget.NewButton("Template", func() {})
+		},
+		func(lii widget.ListItemID, co fyne.CanvasObject) {
+			b := co.(*widget.Button)
+
+			room_name := rooms[lii]
+
+			b.SetText(room_name)
+			b.OnTapped = func() {
+				current_sensors = house[room_name]
+				sensor_listbox.Refresh()
+			}
 		},
 	)
 
 	// The sensor display tab
-	sensor_display := container.NewTabItem(
-		"Sensors",
-		container.NewMax(sensor_displays),
+	sensor_display := container.NewMax(
+		// fyne.NewContainerWithLayout(
+		// 	layout.NewFormLayout(),
+		// 	container.NewMax(room_listbox), container.NewMax(sensor_listbox),
+		// ),
+		container.NewBorder(
+			nil, nil,
+			room_listbox,
+			nil,
+			sensor_listbox,
+		),
 	)
 
-	// * This is the main window content
+	//* This is the main window content
 	w.SetContent(
 		container.NewBorder(
 			container.NewCenter(title_label),
 			nil, nil, nil,
-			container.NewAppTabs(sensor_display),
+			sensor_display,
 		),
 	)
 
