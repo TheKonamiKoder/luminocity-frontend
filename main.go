@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"math/rand"
 	"sort"
 	"strconv"
 
@@ -101,7 +102,8 @@ func main() {
 	}
 	sort.Strings(rooms)
 
-	current_sensors := house[rooms[0]]
+	current_room := rooms[0]
+	current_sensors := house[current_room]
 
 	SENSOR_LIST_ITEM_HEIGHT := 100
 	sensor_listbox := widget.NewList(
@@ -134,7 +136,8 @@ func main() {
 
 			b.SetText(room_name)
 			b.OnTapped = func() {
-				current_sensors = house[room_name]
+				current_room = room_name
+				current_sensors = house[current_room]
 				sensor_listbox.Refresh()
 			}
 		},
@@ -163,9 +166,7 @@ func main() {
 		add_room_form.Hide()
 	}
 
-	add_room_form.OnCancel = func() {
-		add_room_form.Hide()
-	}
+	add_room_form.OnCancel = func() { add_room_form.Hide() }
 
 	left_bar := container.NewBorder(
 		container.NewMax(
@@ -187,13 +188,92 @@ func main() {
 		room_listbox,
 	)
 
+	sensor_name_entry := widget.NewEntry()
+	sensor_type_select := widget.NewSelect(
+		[]string{"Light Sensor", "DHT11 Sensor", "Motion Sensor"},
+		func(s string) {},
+	)
+
+	add_sensor_form := &widget.Form{
+		Items: []*widget.FormItem{
+			{
+				Text:   "Sensor Name:",
+				Widget: sensor_name_entry,
+			},
+			{
+				Text:   "Sensor Type:",
+				Widget: sensor_type_select,
+			},
+		},
+	}
+
+	add_sensor_form.OnSubmit = func() {
+		new_sensor_name := sensor_name_entry.Text
+
+		var (
+			new_sensor_type SensorType
+			new_sensor_data SensorData
+		)
+
+		switch sensor_type_select.Selected {
+		case "Light Sensor":
+			new_sensor_type = LIGHT_SENSOR
+			new_sensor_data = LightSensorData{Val: uint8(rand.Intn(255))} // Data is random for now
+		case "DHT11 Sensor":
+			new_sensor_type = DHT11_SENSOR
+			new_sensor_data = DHT11SensorData{Val: DHT11SensorDataVal{
+				Temperature: (rand.Float32() * 80) - 20,
+				Humidity:    rand.Float32() * 100,
+			}}
+		case "Motion Sensor":
+			new_sensor_type = MOTION_SENSOR
+			new_sensor_data = MotionSensorData{Val: rand.Intn(2) != 0}
+		}
+
+		house[current_room] = append(house[current_room], Sensor{
+			Id:   100,
+			Name: new_sensor_name,
+			Room: current_room,
+			Type: new_sensor_type,
+			Data: new_sensor_data,
+		})
+		current_sensors = house[current_room]
+
+		sensor_listbox.Refresh()
+
+		add_sensor_form.Hide()
+	}
+	add_sensor_form.Hide()
+
+	add_sensor_form.OnCancel = func() { add_sensor_form.Hide() }
+
+	sensor_display := container.NewBorder(
+		container.NewMax(
+			container.NewBorder(
+				nil,
+				widget.NewSeparator(),
+				widget.NewLabel("Sensors"),
+				widget.NewButtonWithIcon(
+					"",
+					theme.ContentAddIcon(),
+					func() {
+						add_sensor_form.Show()
+					},
+				),
+			),
+		),
+		add_sensor_form,
+		nil, nil,
+		sensor_listbox,
+	)
+
 	// The sensor display tab
-	sensor_display := container.NewMax(
+	main_content := container.NewMax(
 		container.NewBorder(
 			nil, nil,
 			left_bar,
 			nil,
-			sensor_listbox,
+			sensor_display,
 		),
 	)
 
@@ -202,7 +282,7 @@ func main() {
 		container.NewBorder(
 			container.NewCenter(title_label),
 			nil, nil, nil,
-			sensor_display,
+			main_content,
 		),
 	)
 
