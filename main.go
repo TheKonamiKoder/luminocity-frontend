@@ -95,22 +95,22 @@ func main() {
 		house[sensor.Room] = append(sensors_in_room, sensor)
 	}
 
-	LIST_ITEM_HEIGHT := 100
-
 	rooms := make([]string, 0, len(house))
 	for r := range house {
 		rooms = append(rooms, r)
 	}
 	sort.Strings(rooms)
+
 	current_sensors := house[rooms[0]]
 
+	SENSOR_LIST_ITEM_HEIGHT := 100
 	sensor_listbox := widget.NewList(
 		func() int {
 			return len(current_sensors)
 		},
 		func() fyne.CanvasObject {
 			template_co := canvas.NewRectangle(color.Black)
-			template_co.SetMinSize(fyne.NewSize(1, LIST_ITEM_HEIGHT))
+			template_co.SetMinSize(fyne.NewSize(1, SENSOR_LIST_ITEM_HEIGHT))
 
 			return container.NewMax(template_co)
 		},
@@ -140,15 +140,58 @@ func main() {
 		},
 	)
 
+	room_name_entry := widget.NewEntry()
+
+	add_room_form := &widget.Form{
+		Items: []*widget.FormItem{
+			{
+				Text:   "Name: ",
+				Widget: room_name_entry,
+			},
+		},
+	}
+	add_room_form.Hide()
+
+	add_room_form.OnSubmit = func() {
+		new_room_name := room_name_entry.Text
+
+		house[new_room_name] = []Sensor{}
+		rooms = append(rooms, new_room_name)
+		sort.Strings(rooms)
+		room_listbox.Refresh()
+
+		add_room_form.Hide()
+	}
+
+	add_room_form.OnCancel = func() {
+		add_room_form.Hide()
+	}
+
+	left_bar := container.NewBorder(
+		container.NewMax(
+			container.NewBorder(
+				nil,
+				widget.NewSeparator(),
+				widget.NewLabel("Rooms"),
+				widget.NewButtonWithIcon(
+					"",
+					theme.ContentAddIcon(),
+					func() {
+						add_room_form.Show()
+					},
+				),
+			),
+		),
+		add_room_form,
+		nil, nil,
+		room_listbox,
+	)
+
 	// The sensor display tab
 	sensor_display := container.NewMax(
-		// fyne.NewContainerWithLayout(
-		// 	layout.NewFormLayout(),
-		// 	container.NewMax(room_listbox), container.NewMax(sensor_listbox),
-		// ),
 		container.NewBorder(
 			nil, nil,
-			room_listbox,
+			left_bar,
 			nil,
 			sensor_listbox,
 		),
