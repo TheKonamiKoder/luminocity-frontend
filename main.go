@@ -20,64 +20,9 @@ func main() {
 
 	title_label := widget.NewLabel("Luminocity")
 
-	sensors := [...]Sensor{
-		{
-			Id:   0,
-			Name: "Ceiling Lights",
-			Room: "Kitchen",
-			Type: LIGHT_SENSOR,
-			Data: LightSensorData{Val: 10},
-		},
-		{
-			Id:   1,
-			Name: "Lamp",
-			Room: "Hall",
-			Type: LIGHT_SENSOR,
-			Data: LightSensorData{Val: 255},
-		},
-		{
-			Id:   1,
-			Name: "Sunlight",
-			Room: "Outside",
-			Type: LIGHT_SENSOR,
-			Data: LightSensorData{Val: 50},
-		},
-		{
-			Id:   3,
-			Name: "Loft",
-			Room: "Loft",
-			Type: DHT11_SENSOR,
-			Data: DHT11SensorData{Val: DHT11SensorDataVal{38, 80}},
-		},
-		{
-			Id:   4,
-			Name: "Basement",
-			Room: "Basement",
-			Type: DHT11_SENSOR,
-			Data: DHT11SensorData{Val: DHT11SensorDataVal{0, 12}},
-		},
-		{
-			Id:   5,
-			Name: "Sun",
-			Room: "Outside",
-			Type: DHT11_SENSOR,
-			Data: DHT11SensorData{Val: DHT11SensorDataVal{50, 90}},
-		},
-		{
-			Id:   6,
-			Name: "Front door",
-			Room: "Outside",
-			Type: MOTION_SENSOR,
-			Data: MotionSensorData{Val: true},
-		},
-		{
-			Id:   7,
-			Name: "Back door",
-			Room: "Garden",
-			Type: MOTION_SENSOR,
-			Data: MotionSensorData{Val: false},
-		},
-	}
+	sensors := []Sensor{}
+
+	UpdateSensorValues(&sensors)
 
 	//* Map with the name of the room and the list of sensors the room has
 	house := make(map[string][]Sensor)
@@ -218,16 +163,16 @@ func main() {
 		switch sensor_type_select.Selected {
 		case "Light Sensor":
 			new_sensor_type = LIGHT_SENSOR
-			new_sensor_data = LightSensorData{Val: uint8(rand.Intn(255))} // Data is random for now
+			new_sensor_data = &LightSensorData{Val: uint8(rand.Intn(255))} // Data is random for now
 		case "DHT11 Sensor":
 			new_sensor_type = DHT11_SENSOR
-			new_sensor_data = DHT11SensorData{Val: DHT11SensorDataVal{
+			new_sensor_data = &DHT11SensorData{Val: DHT11SensorDataVal{
 				Temperature: (rand.Float32() * 80) - 20,
 				Humidity:    rand.Float32() * 100,
 			}}
 		case "Motion Sensor":
 			new_sensor_type = MOTION_SENSOR
-			new_sensor_data = MotionSensorData{Val: rand.Intn(2) != 0}
+			new_sensor_data = &MotionSensorData{Val: rand.Intn(2) != 0}
 		}
 
 		house[current_room] = append(house[current_room], Sensor{
