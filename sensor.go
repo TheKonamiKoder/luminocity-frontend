@@ -104,11 +104,6 @@ func UpdateSensorValues(sensors *[]Sensor) {
 		fmt.Printf("err3: %v\n", err3)
 	}
 
-	//// fmt.Printf("sensors_json: %v\n", sensors_json)
-	//// if len(sensors_json) == 0 {
-	//// 	fmt.Printf("sensors_json is 0")
-	//// }
-
 	for i, json_sensor := range sensors_json {
 		fmt.Printf("i: %v\n", i)
 
@@ -133,7 +128,7 @@ func UpdateSensorValues(sensors *[]Sensor) {
 
 		// It is possible for a sensor's name and value to change
 		sensor.Name = json_sensor.Name
-		sensor.Data.SetVal(json_sensor.Data.Val)
+		sensor.Data.SetVal(jsonSensorToSensor(json_sensor).Data.GetVal())
 	}
 }
 

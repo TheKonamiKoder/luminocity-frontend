@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"time"
 
 	"fyne.io/fyne"
 	"fyne.io/fyne/app"
@@ -21,11 +22,12 @@ func main() {
 	title_label := widget.NewLabel("Luminocity")
 
 	sensors := []Sensor{}
+	house := make(map[string][]Sensor)
+
+	rooms := make([]string, 0, len(house))
+	////rooms := make([]string, 0, len(house))
 
 	UpdateSensorValues(&sensors)
-
-	//* Map with the name of the room and the list of sensors the room has
-	house := make(map[string][]Sensor)
 
 	var sensor Sensor
 	for i := 0; i < len(sensors); i++ {
@@ -41,7 +43,6 @@ func main() {
 		house[sensor.Room] = append(sensors_in_room, sensor)
 	}
 
-	rooms := make([]string, 0, len(house))
 	for r := range house {
 		rooms = append(rooms, r)
 	}
@@ -230,6 +231,53 @@ func main() {
 			main_content,
 		),
 	)
+
+	go func() {
+		for range time.Tick(time.Millisecond) {
+			UpdateSensorValues(&sensors)
+
+			var sensor Sensor
+			for i := 0; i < len(sensors); i++ {
+				sensor = sensors[i]
+
+				sensors_in_room, room_exists := house[sensor.Room]
+
+				if !room_exists {
+					house[sensor.Room] = []Sensor{sensor}
+					continue
+				}
+
+				////house[sensor.Room] = append(sensors_in_room, sensor)
+
+				t := false
+				for j := 0; j < len(sensors_in_room); j++ {
+					if sensors_in_room[j].Id == sensor.Id {
+						sensors_in_room[j].Name = sensor.Name
+						sensors_in_room[j].Data.SetVal(sensor.Data.GetVal())
+						t = true
+					}
+				}
+
+				if !t {
+					house[sensor.Room] = append(house[sensor.Room], sensor)
+				}
+
+			}
+
+			for r := range house {
+				// If the room is not found in the list of rooms, it will be appended
+				if sort.SearchStrings(rooms, r) == len(rooms) {
+					rooms = append(rooms, r)
+				}
+
+			}
+
+			sort.Strings(rooms)
+
+			room_listbox.Refresh()
+			sensor_listbox.Refresh()
+		}
+	}()
 
 	w.ShowAndRun()
 }
