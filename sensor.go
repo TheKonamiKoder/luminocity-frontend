@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 )
 
-type SensorType int
-
 const SERVER_URL = "http://localhost:5000"
+
+type SensorType int
 
 const (
 	LIGHT_SENSOR = iota
@@ -21,6 +22,14 @@ const (
 type SensorData interface {
 	GetVal() interface{}
 	SetVal(Val interface{})
+}
+
+type Sensor struct {
+	Id   uint32
+	Name string
+	Room string
+	Type SensorType
+	Data SensorData
 }
 
 type LightSensorData struct{ Val uint8 }
@@ -60,12 +69,46 @@ func (m *MotionSensorData) SetVal(Val interface{}) {
 	m.Val = Val.(bool)
 }
 
-type Sensor struct {
-	Id   uint32
-	Name string
-	Room string
-	Type SensorType
-	Data SensorData
+type House map[string][]Sensor
+
+func PopulateHouseWithSensors(house *House, sensors []Sensor) {
+	var sensor Sensor
+	for i := 0; i < len(sensors); i++ {
+		sensor = sensors[i]
+
+		sensors_in_room, room_exists := (*house)[sensor.Room]
+
+		if !room_exists {
+			(*house)[sensor.Room] = []Sensor{sensor}
+			continue
+		}
+
+		////house[sensor.Room] = append(sensors_in_room, sensor)
+
+		sensor_is_in_room := false
+		for j := 0; j < len(sensors_in_room); j++ {
+			if sensors_in_room[j].Id == sensor.Id {
+				sensors_in_room[j].Name = sensor.Name
+				sensors_in_room[j].Data.SetVal(sensor.Data.GetVal())
+				sensor_is_in_room = true
+			}
+		}
+
+		if !sensor_is_in_room {
+			(*house)[sensor.Room] = append((*house)[sensor.Room], sensor)
+		}
+
+	}
+}
+
+func (house House) GetRooms() []string {
+	rooms := make([]string, 0, len(house))
+	for r := range house {
+		rooms = append(rooms, r)
+	}
+	sort.Strings(rooms)
+
+	return rooms
 }
 
 // The JsonSensor is used for parsing the json recieved from the server
