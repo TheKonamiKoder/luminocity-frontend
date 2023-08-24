@@ -3,7 +3,6 @@ package main
 import (
 	"image/color"
 	"math/rand"
-	"sort"
 	"strconv"
 	"time"
 
@@ -25,9 +24,8 @@ func main() {
 	UpdateSensorValues(&sensors)
 	house := make(House)
 	PopulateHouseWithSensors(&house, sensors)
-	rooms := house.GetRooms()
 
-	current_room := rooms[0]
+	current_room := house.GetRooms()[0]
 	current_sensors := house[current_room]
 
 	SENSOR_LIST_ITEM_HEIGHT := 100
@@ -49,7 +47,7 @@ func main() {
 
 	room_listbox := widget.NewList(
 		func() int {
-			return len(rooms)
+			return len(house.GetRooms())
 		},
 		func() fyne.CanvasObject {
 			return widget.NewButton("Template", func() {})
@@ -57,7 +55,7 @@ func main() {
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
 			b := co.(*widget.Button)
 
-			room_name := rooms[lii]
+			room_name := house.GetRooms()[lii]
 
 			b.SetText(room_name)
 			b.OnTapped = func() {
@@ -68,48 +66,17 @@ func main() {
 		},
 	)
 
-	room_name_entry := widget.NewEntry()
-
-	add_room_form := &widget.Form{
-		Items: []*widget.FormItem{
-			{
-				Text:   "Name: ",
-				Widget: room_name_entry,
-			},
-		},
-	}
-	add_room_form.Hide()
-
-	add_room_form.OnSubmit = func() {
-		new_room_name := room_name_entry.Text
-
-		house[new_room_name] = []Sensor{}
-		rooms = append(rooms, new_room_name)
-		sort.Strings(rooms)
-		room_listbox.Refresh()
-
-		add_room_form.Hide()
-	}
-
-	add_room_form.OnCancel = func() { add_room_form.Hide() }
-
 	left_bar := container.NewBorder(
 		container.NewMax(
 			container.NewBorder(
 				nil,
 				widget.NewSeparator(),
 				widget.NewLabel("Rooms"),
-				widget.NewButtonWithIcon(
-					"",
-					theme.ContentAddIcon(),
-					func() {
-						add_room_form.Show()
-					},
-				),
+				nil,
 			),
 		),
-		add_room_form,
-		nil, nil,
+		////add_rdoom_form,
+		nil, nil, nil,
 		room_listbox,
 	)
 
@@ -118,6 +85,8 @@ func main() {
 		[]string{"Light Sensor", "DHT11 Sensor", "Motion Sensor"},
 		func(s string) {},
 	)
+	room_select_entry := widget.NewSelectEntry(house.GetRooms())
+	room_select_entry.Text = current_room
 
 	add_sensor_form := &widget.Form{
 		Items: []*widget.FormItem{
@@ -128,6 +97,10 @@ func main() {
 			{
 				Text:   "Sensor Type:",
 				Widget: sensor_type_select,
+			},
+			{
+				Text:   "Room:",
+				Widget: room_select_entry,
 			},
 		},
 	}
@@ -155,6 +128,15 @@ func main() {
 			new_sensor_data = &MotionSensorData{Val: rand.Intn(2) != 0}
 		}
 
+		new_sensor_room := room_select_entry.SelectedText()
+		if new_sensor_room == "" {
+			new_sensor_room = room_select_entry.Entry.Text
+		}
+
+		////fmt.Printf("new_sensor_room: %v\n", new_sensor_room)
+
+		current_room = new_sensor_room
+
 		house[current_room] = append(house[current_room], Sensor{
 			Id:   100,
 			Name: new_sensor_name,
@@ -164,7 +146,10 @@ func main() {
 		})
 		current_sensors = house[current_room]
 
+		room_select_entry.SetOptions(house.GetRooms())
+
 		sensor_listbox.Refresh()
+		room_listbox.Refresh()
 
 		add_sensor_form.Hide()
 	}
@@ -215,7 +200,6 @@ func main() {
 		for range time.Tick(time.Millisecond) {
 			UpdateSensorValues(&sensors)
 			PopulateHouseWithSensors(&house, sensors)
-			rooms = house.GetRooms()
 
 			room_listbox.Refresh()
 			sensor_listbox.Refresh()

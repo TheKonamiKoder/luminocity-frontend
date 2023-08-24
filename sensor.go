@@ -148,15 +148,15 @@ func UpdateSensorValues(sensors *[]Sensor) {
 	}
 
 	for i, json_sensor := range sensors_json {
-		fmt.Printf("i: %v\n", i)
+		////fmt.Printf("i: %v\n", i)
 
 		if i == len(*sensors) {
-			fmt.Printf("jsonSensorToSensor(json_sensor): %v\n", jsonSensorToSensor(json_sensor))
+			////fmt.Printf("jsonSensorToSensor(json_sensor): %v\n", jsonSensorToSensor(json_sensor))
 			*sensors = append(*sensors, jsonSensorToSensor(json_sensor))
 			continue
 		}
 
-		fmt.Printf("(*sensors): %v\n", (*sensors))
+		////fmt.Printf("(*sensors): %v\n", (*sensors))
 
 		sensor := &(*sensors)[i]
 
