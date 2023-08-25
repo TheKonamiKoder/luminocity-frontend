@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -128,23 +129,24 @@ type JsonSensor struct {
 }
 
 func UpdateSensorValues(sensors *[]Sensor) {
-	resp, err1 := http.Get("http://localhost:5000/get_all")
-	if err1 != nil {
-		fmt.Printf("err1: %v\n", err1)
+	resp, err := http.Get("http://localhost:5000/get_all")
+	if err != nil {
+		fmt.Printf("Get Request Error: %v\n", err)
 	}
 
 	defer resp.Body.Close()
 
-	body, err2 := io.ReadAll(resp.Body)
-	if err2 != nil {
-		fmt.Printf("err2: %v\n", err2)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Printf("Reading Response Error: %v\n", err)
 	}
 
 	var sensors_json []JsonSensor
 
-	err3 := json.Unmarshal(body, &sensors_json)
-	if err3 != nil {
-		fmt.Printf("err3: %v\n", err3)
+	err = json.Unmarshal(body, &sensors_json)
+	if err != nil {
+		fmt.Printf("Json Unmarshaling Error: %v\n", err)
+		fmt.Printf("body: %v\n", string(body))
 	}
 
 	for i, json_sensor := range sensors_json {
@@ -204,5 +206,33 @@ func jsonSensorToSensor(json_sensor JsonSensor) Sensor {
 				panic("Unknown sensor type")
 			}
 		}(),
+	}
+}
+
+type SensorPost struct {
+	Name string     `json:"name"`
+	Room string     `json:"room"`
+	Type SensorType `json:"type"`
+}
+
+func AddSensorToServer(name string, room string, sensor_type SensorType) {
+	body, err := json.Marshal(
+		SensorPost{
+			Name: name,
+			Room: room,
+			Type: sensor_type,
+		},
+	)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
+	}
+
+	_, err = http.Post(
+		"http://localhost:5000/add_sensor",
+		"application/json",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		fmt.Printf("err: %v\n", err)
 	}
 }

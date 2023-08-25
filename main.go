@@ -2,7 +2,6 @@ package main
 
 import (
 	"image/color"
-	"math/rand"
 	"strconv"
 	"time"
 
@@ -26,12 +25,12 @@ func main() {
 	PopulateHouseWithSensors(&house, sensors)
 
 	current_room := house.GetRooms()[0]
-	current_sensors := house[current_room]
+	//current_sensors := house[current_room]
 
 	SENSOR_LIST_ITEM_HEIGHT := 100
 	sensor_listbox := widget.NewList(
 		func() int {
-			return len(current_sensors)
+			return len(house[current_room])
 		},
 		func() fyne.CanvasObject {
 			template_co := canvas.NewRectangle(color.Black)
@@ -41,7 +40,7 @@ func main() {
 		},
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
 			c := co.(*fyne.Container)
-			c.Objects[0] = newSensorCavasObject(current_sensors[lii])
+			c.Objects[0] = newSensorCavasObject(house[current_room][lii])
 		},
 	)
 
@@ -60,7 +59,7 @@ func main() {
 			b.SetText(room_name)
 			b.OnTapped = func() {
 				current_room = room_name
-				current_sensors = house[current_room]
+				//current_sensors = house[current_room]
 				sensor_listbox.Refresh()
 			}
 		},
@@ -108,45 +107,25 @@ func main() {
 	add_sensor_form.OnSubmit = func() {
 		new_sensor_name := sensor_name_entry.Text
 
-		var (
-			new_sensor_type SensorType
-			new_sensor_data SensorData
-		)
-
-		switch sensor_type_select.Selected {
-		case "Light Sensor":
-			new_sensor_type = LIGHT_SENSOR
-			new_sensor_data = &LightSensorData{Val: uint8(rand.Intn(255))} // Data is random for now
-		case "DHT11 Sensor":
-			new_sensor_type = DHT11_SENSOR
-			new_sensor_data = &DHT11SensorData{Val: DHT11SensorDataVal{
-				Temperature: (rand.Float32() * 80) - 20,
-				Humidity:    rand.Float32() * 100,
-			}}
-		case "Motion Sensor":
-			new_sensor_type = MOTION_SENSOR
-			new_sensor_data = &MotionSensorData{Val: rand.Intn(2) != 0}
-		}
-
 		new_sensor_room := room_select_entry.SelectedText()
 		if new_sensor_room == "" {
 			new_sensor_room = room_select_entry.Entry.Text
 		}
 
-		////fmt.Printf("new_sensor_room: %v\n", new_sensor_room)
+		var new_sensor_type SensorType
+
+		switch sensor_type_select.Selected {
+		case "Light Sensor":
+			new_sensor_type = LIGHT_SENSOR
+		case "DHT11 Sensor":
+			new_sensor_type = DHT11_SENSOR
+		case "Motion Sensor":
+			new_sensor_type = MOTION_SENSOR
+		}
 
 		current_room = new_sensor_room
 
-		house[current_room] = append(house[current_room], Sensor{
-			Id:   100,
-			Name: new_sensor_name,
-			Room: current_room,
-			Type: new_sensor_type,
-			Data: new_sensor_data,
-		})
-		current_sensors = house[current_room]
-
-		room_select_entry.SetOptions(house.GetRooms())
+		AddSensorToServer(new_sensor_name, new_sensor_room, new_sensor_type)
 
 		sensor_listbox.Refresh()
 		room_listbox.Refresh()
