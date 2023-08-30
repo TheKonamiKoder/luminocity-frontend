@@ -9,7 +9,7 @@ import (
 	"sort"
 )
 
-const SERVER_URL = "http://localhost:5000"
+const SERVER_URL = "http://192.168.1.90:5000"
 
 type SensorType int
 
@@ -26,7 +26,7 @@ type SensorData interface {
 }
 
 type Sensor struct {
-	Id   uint32
+	Id   uint64
 	Name string
 	Room string
 	Type SensorType
@@ -119,17 +119,15 @@ func (house House) GetRooms() []string {
 // API based on the product (Go only exports fields with capital letters, but python
 // doesn't care about the capital letters), I decided to use the struct tags
 type JsonSensor struct {
-	Id   uint32     `json:"id"`
-	Name string     `json:"name"`
-	Room string     `json:"room"`
-	Type SensorType `json:"type"`
-	Data struct {
-		Val interface{} `json:"val"`
-	} `json:"data"`
+	Id   uint64      `json:"id"`
+	Name string      `json:"name"`
+	Room string      `json:"room"`
+	Type SensorType  `json:"type"`
+	Val  interface{} `json:"val"`
 }
 
 func UpdateSensorValues(sensors *[]Sensor) {
-	resp, err := http.Get("http://localhost:5000/get_all")
+	resp, err := http.Get(SERVER_URL + "/get_all")
 	if err != nil {
 		fmt.Printf("Get Request Error: %v\n", err)
 	}
@@ -150,20 +148,15 @@ func UpdateSensorValues(sensors *[]Sensor) {
 	}
 
 	for i, json_sensor := range sensors_json {
-		////fmt.Printf("i: %v\n", i)
-
 		if i == len(*sensors) {
-			////fmt.Printf("jsonSensorToSensor(json_sensor): %v\n", jsonSensorToSensor(json_sensor))
 			*sensors = append(*sensors, jsonSensorToSensor(json_sensor))
 			continue
 		}
 
-		////fmt.Printf("(*sensors): %v\n", (*sensors))
-
 		sensor := &(*sensors)[i]
 
 		// A sensor's id will never change, even though it's name may.
-		// A sensor's room and type will also never change.
+		// A sensor's type will also never change.
 		// If a sensor does not have same id as json_sensor's id, it must have been deleted.
 		if sensor.Id != json_sensor.Id {
 			// Removes the sensor by creating a new slice without it
@@ -171,8 +164,9 @@ func UpdateSensorValues(sensors *[]Sensor) {
 			continue
 		}
 
-		// It is possible for a sensor's name and value to change
+		// It is possible for a sensor's name, room and value to change
 		sensor.Name = json_sensor.Name
+		sensor.Room = json_sensor.Room
 		sensor.Data.SetVal(jsonSensorToSensor(json_sensor).Data.GetVal())
 	}
 }
@@ -188,19 +182,19 @@ func jsonSensorToSensor(json_sensor JsonSensor) Sensor {
 			case LIGHT_SENSOR:
 				return &LightSensorData{
 					// The json library casts every numeric item to a float64 apparently
-					Val: uint8(json_sensor.Data.Val.(float64)),
+					Val: uint8(json_sensor.Val.(float64)),
 				}
 			case DHT11_SENSOR:
 				return &DHT11SensorData{
 					Val: DHT11SensorDataVal{
 						// The json library also casts arrays to []interface{} also...
-						Temperature: float32(json_sensor.Data.Val.([]interface{})[0].(float64)),
-						Humidity:    float32(json_sensor.Data.Val.([]interface{})[1].(float64)),
+						Temperature: float32(json_sensor.Val.([]interface{})[0].(float64)),
+						Humidity:    float32(json_sensor.Val.([]interface{})[1].(float64)),
 					},
 				}
 			case MOTION_SENSOR:
 				return &MotionSensorData{
-					Val: json_sensor.Data.Val.(bool),
+					Val: json_sensor.Val.(bool),
 				}
 			default:
 				panic("Unknown sensor type")

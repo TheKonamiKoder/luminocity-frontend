@@ -176,7 +176,7 @@ func main() {
 	)
 
 	go func() {
-		for range time.Tick(time.Millisecond) {
+		for range time.Tick(time.Second) {
 			UpdateSensorValues(&sensors)
 			PopulateHouseWithSensors(&house, sensors)
 
