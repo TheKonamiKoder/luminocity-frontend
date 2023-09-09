@@ -19,6 +19,19 @@ const (
 	MOTION_SENSOR
 )
 
+func (st SensorType) GetName() string {
+	switch st {
+	case LIGHT_SENSOR:
+		return "Light"
+	case DHT11_SENSOR:
+		return "DHT11"
+	case MOTION_SENSOR:
+		return "Motion"
+	default:
+		return "Unknown"
+	}
+}
+
 // LightSensorData | TemperatureSensorData | HumiditySensorData | MotionSensorData
 type SensorData interface {
 	GetVal() interface{}
@@ -203,30 +216,30 @@ func jsonSensorToSensor(json_sensor JsonSensor) Sensor {
 	}
 }
 
-type SensorPost struct {
-	Name string     `json:"name"`
-	Room string     `json:"room"`
-	Type SensorType `json:"type"`
+type RenameSensorBody struct {
+	Id   uint64 `json:"id"`
+	Name string `json:"name"`
+	Room string `json:"room"`
 }
 
-func AddSensorToServer(name string, room string, sensor_type SensorType) {
+func RenameSensor(sensor_id uint64, new_name string, new_room_name string) {
 	body, err := json.Marshal(
-		SensorPost{
-			Name: name,
-			Room: room,
-			Type: sensor_type,
+		RenameSensorBody{
+			Id:   sensor_id,
+			Name: new_name,
+			Room: new_room_name,
 		},
 	)
 	if err != nil {
-		fmt.Printf("err: %v\n", err)
+		fmt.Printf("JSON Marshalling Error: %v\n", err)
 	}
 
 	_, err = http.Post(
-		"http://localhost:5000/add_sensor",
+		SERVER_URL+"/rename_sensor",
 		"application/json",
 		bytes.NewReader(body),
 	)
 	if err != nil {
-		fmt.Printf("err: %v\n", err)
+		fmt.Printf("Post Request Error: %v\n", err)
 	}
 }

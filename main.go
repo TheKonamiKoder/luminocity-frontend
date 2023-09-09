@@ -38,10 +38,8 @@ func main() {
 
 			return container.NewMax(template_co)
 		},
-		func(lii widget.ListItemID, co fyne.CanvasObject) {
-			c := co.(*fyne.Container)
-			c.Objects[0] = newSensorCavasObject(house[current_room][lii])
-		},
+		// This is defined later on using a closure that has access to the rename_sensor_form
+		func(lii widget.ListItemID, co fyne.CanvasObject) {},
 	)
 
 	room_listbox := widget.NewList(
@@ -80,22 +78,17 @@ func main() {
 	)
 
 	sensor_name_entry := widget.NewEntry()
-	sensor_type_select := widget.NewSelect(
-		[]string{"Light Sensor", "DHT11 Sensor", "Motion Sensor"},
-		func(s string) {},
-	)
+	sensor_name_entry.SetPlaceHolder("Sensor Name")
 	room_select_entry := widget.NewSelectEntry(house.GetRooms())
-	room_select_entry.Text = current_room
+	room_select_entry.SetPlaceHolder("Room Name")
 
-	add_sensor_form := &widget.Form{
+	// The OnSubmit function will be changed by the menu.
+	// Not the best way to do this, but this is the simplest way that I can think of.
+	rename_sensor_form := &widget.Form{
 		Items: []*widget.FormItem{
 			{
 				Text:   "Sensor Name:",
 				Widget: sensor_name_entry,
-			},
-			{
-				Text:   "Sensor Type:",
-				Widget: sensor_type_select,
 			},
 			{
 				Text:   "Room:",
@@ -104,37 +97,75 @@ func main() {
 		},
 	}
 
-	add_sensor_form.OnSubmit = func() {
-		new_sensor_name := sensor_name_entry.Text
+	// rename_sensor_form.OnSubmit = func() {
+	// 	new_sensor_name := sensor_name_entry.Text
 
-		new_sensor_room := room_select_entry.SelectedText()
-		if new_sensor_room == "" {
-			new_sensor_room = room_select_entry.Entry.Text
-		}
+	// 	new_sensor_room := room_select_entry.SelectedText()
+	// 	if new_sensor_room == "" {
+	// 		new_sensor_room = room_select_entry.Entry.Text
+	// 	}
 
-		var new_sensor_type SensorType
+	// 	current_room = new_sensor_room
 
-		switch sensor_type_select.Selected {
-		case "Light Sensor":
-			new_sensor_type = LIGHT_SENSOR
-		case "DHT11 Sensor":
-			new_sensor_type = DHT11_SENSOR
-		case "Motion Sensor":
-			new_sensor_type = MOTION_SENSOR
-		}
+	// 	AddSensorToServer(new_sensor_name, new_sensor_room)
 
-		current_room = new_sensor_room
+	// 	sensor_listbox.Refresh()
+	// 	room_listbox.Refresh()
 
-		AddSensorToServer(new_sensor_name, new_sensor_room, new_sensor_type)
+	// 	rename_sensor_form.Hide()
+	// }
+	rename_sensor_form.Hide()
 
-		sensor_listbox.Refresh()
-		room_listbox.Refresh()
+	rename_sensor_form.OnCancel = func() { rename_sensor_form.Hide() }
 
-		add_sensor_form.Hide()
+	sensor_listbox.UpdateItem = func(lii widget.ListItemID, co fyne.CanvasObject) {
+		c := co.(*fyne.Container)
+		c.Objects[0] = newFinalSensorCanvasObject(
+			house[current_room][lii],
+			newSensorCavasObject(house[current_room][lii]),
+			fyne.Menu{
+				Label: "",
+				Items: []*fyne.MenuItem{
+					{
+						Label: "Rename",
+						Action: func() {
+							sensor_name_entry.SetText(house[current_room][lii].Name)
+							room_select_entry.Entry.SetText(house[current_room][lii].Room)
+
+							rename_sensor_form.OnSubmit = func() {
+								RenameSensor(
+									house[current_room][lii].Id,
+									sensor_name_entry.Text,
+									room_select_entry.Entry.Text,
+								)
+
+								// Remove the sensor from that room.
+								house[current_room] = append(
+									house[current_room][:lii],
+									house[current_room][lii+1:]...,
+								)
+
+								room_listbox.Refresh()
+								sensor_listbox.Refresh()
+
+								rename_sensor_form.Hide()
+							}
+
+							rename_sensor_form.Show()
+						},
+					},
+					{
+						Label: "Delete",
+						Action: func() {
+							house[current_room] = append(
+								house[current_room][:lii], house[current_room][lii+1:]...,
+							)
+						},
+					},
+				},
+			},
+		)
 	}
-	add_sensor_form.Hide()
-
-	add_sensor_form.OnCancel = func() { add_sensor_form.Hide() }
 
 	sensor_display := container.NewBorder(
 		container.NewMax(
@@ -142,16 +173,10 @@ func main() {
 				nil,
 				widget.NewSeparator(),
 				widget.NewLabel("Sensors"),
-				widget.NewButtonWithIcon(
-					"",
-					theme.ContentAddIcon(),
-					func() {
-						add_sensor_form.Show()
-					},
-				),
+				nil,
 			),
 		),
-		add_sensor_form,
+		rename_sensor_form,
 		nil, nil,
 		sensor_listbox,
 	)
@@ -166,7 +191,7 @@ func main() {
 		),
 	)
 
-	//* This is the main window content
+	// This is the main window content
 	w.SetContent(
 		container.NewBorder(
 			container.NewCenter(title_label),
@@ -179,6 +204,16 @@ func main() {
 		for range time.Tick(time.Second) {
 			UpdateSensorValues(&sensors)
 			PopulateHouseWithSensors(&house, sensors)
+
+			// Delete empty rooms
+			for room := range house {
+				if len(house[room]) == 0 {
+					delete(house, room)
+				}
+			}
+
+			// Update the selection of rooms with all rooms
+			room_select_entry.SetOptions(house.GetRooms())
 
 			room_listbox.Refresh()
 			sensor_listbox.Refresh()
@@ -197,7 +232,7 @@ func newSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 	case MOTION_SENSOR:
 		return newMotionSensorCanvasObject(sensor)
 	default:
-		return widget.NewLabel("Template")
+		return widget.NewLabel("Unknown Sensor Type")
 	}
 }
 
@@ -225,7 +260,7 @@ func newLightSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 		container.NewCenter(sensor_value),
 	)
 
-	return newFinalSensorCanvasObject(sensor, light_co)
+	return light_co
 }
 
 func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
@@ -295,7 +330,7 @@ func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 		),
 	)
 
-	return newFinalSensorCanvasObject(sensor, dht11_co)
+	return dht11_co
 }
 
 func newMotionSensorCanvasObject(sensor Sensor) fyne.CanvasObject {
@@ -339,25 +374,22 @@ func newMotionSensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 		container.NewCenter(text_indication),
 	)
 
-	return newFinalSensorCanvasObject(sensor, motion_co)
+	return motion_co
 
 }
 
-// Wraps the main part of the sensor in the repetitive part
-func newFinalSensorCanvasObject(sensor Sensor, sensor_co fyne.CanvasObject) fyne.CanvasObject {
+type ContextMenuButton struct {
+	widget.Button
+	menu *fyne.Menu
+}
 
-	sensor_type_name := func() string {
-		switch sensor.Type {
-		case LIGHT_SENSOR:
-			return "Light"
-		case DHT11_SENSOR:
-			return "DHT11"
-		case MOTION_SENSOR:
-			return "Motion"
-		default:
-			return "Unknown"
-		}
-	}()
+func (b *ContextMenuButton) Tapped(e *fyne.PointEvent) {
+	widget.ShowPopUpMenuAtPosition(b.menu, fyne.CurrentApp().Driver().CanvasForObject(b), e.AbsolutePosition)
+}
+
+func newFinalSensorCanvasObject(sensor Sensor, sensor_co fyne.CanvasObject, menu fyne.Menu) fyne.CanvasObject {
+
+	sensor_type_name := sensor.Type.GetName()
 
 	final_co := container.NewMax(
 		container.NewBorder(
@@ -365,11 +397,11 @@ func newFinalSensorCanvasObject(sensor Sensor, sensor_co fyne.CanvasObject) fyne
 				container.NewBorder(
 					nil, nil,
 					widget.NewLabel(sensor.Name+" ("+sensor_type_name+")"),
-					widget.NewButtonWithIcon(
-						"",
-						theme.MenuIcon(),
-						func() {}, // TODO: Show option to see log and analytics
-					),
+					&ContextMenuButton{
+						Button: *widget.NewButtonWithIcon(
+							"", theme.MenuIcon(), func() {}),
+						menu: &menu,
+					},
 				),
 			),
 			nil, nil, nil,
