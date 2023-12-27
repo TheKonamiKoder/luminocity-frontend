@@ -83,7 +83,7 @@ func main() {
 	room_select_entry.SetPlaceHolder("Room Name")
 
 	// The OnSubmit function will be changed by the menu.
-	// Not the best way to do this, but this is the simplest way that I can think of.
+	// Probably not the best way to do this, but this is the simplest way that I can think of.
 	rename_sensor_form := &widget.Form{
 		Items: []*widget.FormItem{
 			{
@@ -97,23 +97,6 @@ func main() {
 		},
 	}
 
-	// rename_sensor_form.OnSubmit = func() {
-	// 	new_sensor_name := sensor_name_entry.Text
-
-	// 	new_sensor_room := room_select_entry.SelectedText()
-	// 	if new_sensor_room == "" {
-	// 		new_sensor_room = room_select_entry.Entry.Text
-	// 	}
-
-	// 	current_room = new_sensor_room
-
-	// 	AddSensorToServer(new_sensor_name, new_sensor_room)
-
-	// 	sensor_listbox.Refresh()
-	// 	room_listbox.Refresh()
-
-	// 	rename_sensor_form.Hide()
-	// }
 	rename_sensor_form.Hide()
 
 	rename_sensor_form.OnCancel = func() { rename_sensor_form.Hide() }
@@ -158,7 +141,8 @@ func main() {
 						Label: "Delete",
 						Action: func() {
 							house[current_room] = append(
-								house[current_room][:lii], house[current_room][lii+1:]...,
+								house[current_room][:lii],
+								house[current_room][lii+1:]...,
 							)
 						},
 					},
