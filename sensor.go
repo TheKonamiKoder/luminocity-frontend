@@ -11,15 +11,17 @@ import (
 
 const SERVER_URL = "http://192.168.1.90:5000"
 
-type SensorType int
+type ComponentType int
 
 const (
-	LIGHT_SENSOR = iota
-	DHT11_SENSOR
-	MOTION_SENSOR
+	LED_ACTUATOR = -1
+
+	LIGHT_SENSOR  = 1
+	DHT11_SENSOR  = 2
+	MOTION_SENSOR = 3
 )
 
-func (st SensorType) GetName() string {
+func (st ComponentType) GetName() string {
 	switch st {
 	case LIGHT_SENSOR:
 		return "Light"
@@ -33,17 +35,27 @@ func (st SensorType) GetName() string {
 }
 
 // LightSensorData | TemperatureSensorData | HumiditySensorData | MotionSensorData
-type SensorData interface {
+type ComponentData interface {
 	GetVal() interface{}
 	SetVal(Val interface{})
 }
 
-type Sensor struct {
+type Component struct {
 	Id   uint64
 	Name string
 	Room string
-	Type SensorType
-	Data SensorData
+	Type ComponentType
+	Data ComponentData
+}
+
+type LEDActuatorData struct{ Val bool }
+
+func (l LEDActuatorData) GetVal() interface{} {
+	return l.Val
+}
+
+func (l *LEDActuatorData) SetVal(Val interface{}) {
+	l.Val = Val.(bool)
 }
 
 type LightSensorData struct{ Val uint8 }
@@ -83,17 +95,17 @@ func (m *MotionSensorData) SetVal(Val interface{}) {
 	m.Val = Val.(bool)
 }
 
-type House map[string][]Sensor
+type House map[string][]Component
 
-func PopulateHouseWithSensors(house *House, sensors []Sensor) {
-	var sensor Sensor
+func PopulateHouseWithSensors(house *House, sensors []Component) {
+	var sensor Component
 	for i := 0; i < len(sensors); i++ {
 		sensor = sensors[i]
 
 		sensors_in_room, room_exists := (*house)[sensor.Room]
 
 		if !room_exists {
-			(*house)[sensor.Room] = []Sensor{sensor}
+			(*house)[sensor.Room] = []Component{sensor}
 			continue
 		}
 
@@ -132,14 +144,14 @@ func (house House) GetRooms() []string {
 // API based on the product (Go only exports fields with capital letters, but python
 // doesn't care about the capital letters), I decided to use the struct tags
 type JsonSensor struct {
-	Id   uint64      `json:"id"`
-	Name string      `json:"name"`
-	Room string      `json:"room"`
-	Type SensorType  `json:"type"`
-	Val  interface{} `json:"val"`
+	Id   uint64        `json:"id"`
+	Name string        `json:"name"`
+	Room string        `json:"room"`
+	Type ComponentType `json:"type"`
+	Val  interface{}   `json:"val"`
 }
 
-func UpdateSensorValues(sensors *[]Sensor) {
+func UpdateSensorValues(sensors *[]Component) {
 	resp, err := http.Get(SERVER_URL + "/get_all")
 	if err != nil {
 		fmt.Printf("Get Request Error: %v\n", err)
@@ -184,14 +196,18 @@ func UpdateSensorValues(sensors *[]Sensor) {
 	}
 }
 
-func jsonSensorToSensor(json_sensor JsonSensor) Sensor {
-	return Sensor{
+func jsonSensorToSensor(json_sensor JsonSensor) Component {
+	return Component{
 		Id:   json_sensor.Id,
 		Name: json_sensor.Name,
 		Room: json_sensor.Room,
 		Type: json_sensor.Type,
-		Data: func() SensorData {
+		Data: func() ComponentData {
 			switch json_sensor.Type {
+			case LED_ACTUATOR:
+				return &LEDActuatorData{
+					Val: json_sensor.Val.(bool),
+				}
 			case LIGHT_SENSOR:
 				return &LightSensorData{
 					// The json library casts every numeric item to a float64 apparently
@@ -235,7 +251,7 @@ func RenameSensor(sensor_id uint64, new_name string, new_room_name string) {
 	}
 
 	_, err = http.Post(
-		SERVER_URL+"/rename_sensor",
+		SERVER_URL+"/rename_component",
 		"application/json",
 		bytes.NewReader(body),
 	)

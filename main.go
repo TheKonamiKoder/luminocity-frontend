@@ -19,7 +19,18 @@ func main() {
 
 	title_label := widget.NewLabel("Luminocity")
 
-	sensors := []Sensor{}
+	sensors := []Component{
+		{
+			Id:   0,
+			Name: "Light Sensor",
+			Room: "Bedroom",
+			Type: LIGHT_SENSOR,
+			Data: &LightSensorData{
+				Val: 100,
+			},
+		},
+	}
+
 	UpdateSensorValues(&sensors)
 	house := make(House)
 	PopulateHouseWithSensors(&house, sensors)
@@ -207,7 +218,7 @@ func main() {
 	w.ShowAndRun()
 }
 
-func newSensorCavasObject(sensor Sensor) fyne.CanvasObject {
+func newSensorCavasObject(sensor Component) fyne.CanvasObject {
 	switch sensor.Type {
 	case LIGHT_SENSOR:
 		return newLightSensorCavasObject(sensor)
@@ -220,7 +231,7 @@ func newSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 	}
 }
 
-func newLightSensorCavasObject(sensor Sensor) fyne.CanvasObject {
+func newLightSensorCavasObject(sensor Component) fyne.CanvasObject {
 
 	// Creates a rectangle with a yellow colour to display the light
 	color_indication := canvas.NewRectangle(
@@ -247,7 +258,7 @@ func newLightSensorCavasObject(sensor Sensor) fyne.CanvasObject {
 	return light_co
 }
 
-func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
+func newDHT11SensorCanvasObject(sensor Component) fyne.CanvasObject {
 
 	temperature := sensor.Data.GetVal().(DHT11SensorDataVal).Temperature
 
@@ -317,7 +328,7 @@ func newDHT11SensorCanvasObject(sensor Sensor) fyne.CanvasObject {
 	return dht11_co
 }
 
-func newMotionSensorCanvasObject(sensor Sensor) fyne.CanvasObject {
+func newMotionSensorCanvasObject(sensor Component) fyne.CanvasObject {
 
 	movement := sensor.Data.GetVal().(bool)
 
@@ -371,7 +382,7 @@ func (b *ContextMenuButton) Tapped(e *fyne.PointEvent) {
 	widget.ShowPopUpMenuAtPosition(b.menu, fyne.CurrentApp().Driver().CanvasForObject(b), e.AbsolutePosition)
 }
 
-func newFinalSensorCanvasObject(sensor Sensor, sensor_co fyne.CanvasObject, menu fyne.Menu) fyne.CanvasObject {
+func newFinalSensorCanvasObject(sensor Component, sensor_co fyne.CanvasObject, menu fyne.Menu) fyne.CanvasObject {
 
 	sensor_type_name := sensor.Type.GetName()
 
