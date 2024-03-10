@@ -19,47 +19,44 @@ func main() {
 
 	title_label := widget.NewLabel("Luminocity")
 
-	sensors := []Component{
-		{
-			Id:   0,
-			Name: "Light Sensor",
-			Room: "Bedroom",
-			Type: LIGHT_SENSOR,
-			Data: &LightSensorData{
-				Val: 100,
-			},
-		},
-	}
+	components := []Component{}
 
-	UpdateSensorValues(&sensors)
+	GetComponents(&components)
 	house := make(House)
-	PopulateHouseWithSensors(&house, sensors)
+	PopulateHouseWithComponents(&house, components)
 
 	current_room := house.GetRooms()[0]
-	//current_sensors := house[current_room]
+
+	// ************************ DISPLAYS ************************
 
 	SENSOR_LIST_ITEM_HEIGHT := 100
-	sensor_listbox := widget.NewList(
+	component_listbox := widget.NewList(
+		// returns total items in the list
 		func() int {
 			return len(house[current_room])
-		},
+		}, // length
+
+		// Creates template objects for all the items in the list, which are then
+		// changed in relation to type of item
 		func() fyne.CanvasObject {
 			template_co := canvas.NewRectangle(color.Black)
 			template_co.SetMinSize(fyne.NewSize(1, SENSOR_LIST_ITEM_HEIGHT))
 
 			return container.NewMax(template_co)
-		},
-		// This is defined later on using a closure that has access to the rename_sensor_form
-		func(lii widget.ListItemID, co fyne.CanvasObject) {},
+		}, // createItem
+
+		// *This is defined later on using a closure that has access to the rename_component_form*
+		// *It had to be after the rename_component_form to be declared)*
+		func(lii widget.ListItemID, co fyne.CanvasObject) {}, // updateItem
 	)
 
 	room_listbox := widget.NewList(
 		func() int {
 			return len(house.GetRooms())
-		},
+		}, // length
 		func() fyne.CanvasObject {
 			return widget.NewButton("Template", func() {})
-		},
+		}, // createItem
 		func(lii widget.ListItemID, co fyne.CanvasObject) {
 			b := co.(*widget.Button)
 
@@ -68,10 +65,9 @@ func main() {
 			b.SetText(room_name)
 			b.OnTapped = func() {
 				current_room = room_name
-				//current_sensors = house[current_room]
-				sensor_listbox.Refresh()
+				component_listbox.Refresh()
 			}
-		},
+		}, // updateItem
 	)
 
 	left_bar := container.NewBorder(
@@ -88,18 +84,18 @@ func main() {
 		room_listbox,
 	)
 
-	sensor_name_entry := widget.NewEntry()
-	sensor_name_entry.SetPlaceHolder("Sensor Name")
+	component_name_entry := widget.NewEntry()
+	component_name_entry.SetPlaceHolder("Sensor Name")
 	room_select_entry := widget.NewSelectEntry(house.GetRooms())
 	room_select_entry.SetPlaceHolder("Room Name")
 
-	// The OnSubmit function will be changed by the menu.
-	// Probably not the best way to do this, but this is the simplest way that I can think of.
-	rename_sensor_form := &widget.Form{
+	// The OnSubmit function will be changed by the menu with a closure that has access to the id
+	// Probably not the best way to do this, but this is the simplest way that I can think of
+	rename_component_form := &widget.Form{
 		Items: []*widget.FormItem{
 			{
 				Text:   "Sensor Name:",
-				Widget: sensor_name_entry,
+				Widget: component_name_entry,
 			},
 			{
 				Text:   "Room:",
@@ -108,47 +104,49 @@ func main() {
 		},
 	}
 
-	rename_sensor_form.Hide()
+	rename_component_form.Hide()
 
-	rename_sensor_form.OnCancel = func() { rename_sensor_form.Hide() }
+	rename_component_form.OnCancel = func() { rename_component_form.Hide() }
 
-	sensor_listbox.UpdateItem = func(lii widget.ListItemID, co fyne.CanvasObject) {
+	component_listbox.UpdateItem = func(lii widget.ListItemID, co fyne.CanvasObject) {
 		c := co.(*fyne.Container)
 		c.Objects[0] = newFinalSensorCanvasObject(
 			house[current_room][lii],
 			newSensorCavasObject(house[current_room][lii]),
+			// The menu is there so that items can be renamed and delet4ed and anything else
 			fyne.Menu{
 				Label: "",
 				Items: []*fyne.MenuItem{
 					{
 						Label: "Rename",
 						Action: func() {
-							sensor_name_entry.SetText(house[current_room][lii].Name)
+							component_name_entry.SetText(house[current_room][lii].Name)
 							room_select_entry.Entry.SetText(house[current_room][lii].Room)
 
-							rename_sensor_form.OnSubmit = func() {
+							rename_component_form.OnSubmit = func() {
 								RenameSensor(
 									house[current_room][lii].Id,
-									sensor_name_entry.Text,
+									component_name_entry.Text,
 									room_select_entry.Entry.Text,
 								)
 
-								// Remove the sensor from that room.
+								// Remove the component from that room.
 								house[current_room] = append(
 									house[current_room][:lii],
 									house[current_room][lii+1:]...,
 								)
 
 								room_listbox.Refresh()
-								sensor_listbox.Refresh()
+								component_listbox.Refresh()
 
-								rename_sensor_form.Hide()
+								rename_component_form.Hide()
 							}
 
-							rename_sensor_form.Show()
+							rename_component_form.Show()
 						},
 					},
 					{
+						// TODO: Make this actually work - at the moment, there is no DELETE method
 						Label: "Delete",
 						Action: func() {
 							house[current_room] = append(
@@ -162,7 +160,7 @@ func main() {
 		)
 	}
 
-	sensor_display := container.NewBorder(
+	component_display := container.NewBorder(
 		container.NewMax(
 			container.NewBorder(
 				nil,
@@ -171,18 +169,18 @@ func main() {
 				nil,
 			),
 		),
-		rename_sensor_form,
+		rename_component_form,
 		nil, nil,
-		sensor_listbox,
+		component_listbox,
 	)
 
-	// The sensor display tab
+	// The component display tab
 	main_content := container.NewMax(
 		container.NewBorder(
 			nil, nil,
 			left_bar,
 			nil,
-			sensor_display,
+			component_display,
 		),
 	)
 
@@ -195,10 +193,11 @@ func main() {
 		),
 	)
 
+	// Asynchronous function that is responsible for keeping the components list up to date
 	go func() {
 		for range time.Tick(time.Second) {
-			UpdateSensorValues(&sensors)
-			PopulateHouseWithSensors(&house, sensors)
+			GetComponents(&components)
+			PopulateHouseWithComponents(&house, components)
 
 			// Delete empty rooms
 			for room := range house {
@@ -211,33 +210,99 @@ func main() {
 			room_select_entry.SetOptions(house.GetRooms())
 
 			room_listbox.Refresh()
-			sensor_listbox.Refresh()
+			component_listbox.Refresh()
 		}
 	}()
 
 	w.ShowAndRun()
 }
 
-func newSensorCavasObject(sensor Component) fyne.CanvasObject {
-	switch sensor.Type {
+// ************************ COMPONENT CANVAS OBJECTS ************************
+
+func newSensorCavasObject(component Component) fyne.CanvasObject {
+	switch component.Type {
+	case LED_ACTUATOR:
+		return newLEDActuatorCanvasObject(component)
 	case LIGHT_SENSOR:
-		return newLightSensorCavasObject(sensor)
+		return newLightSensorCavasObject(component)
 	case DHT11_SENSOR:
-		return newDHT11SensorCanvasObject(sensor)
+		return newDHT11SensorCanvasObject(component)
 	case MOTION_SENSOR:
-		return newMotionSensorCanvasObject(sensor)
+		return newMotionSensorCanvasObject(component)
 	default:
 		return widget.NewLabel("Unknown Sensor Type")
 	}
 }
 
-func newLightSensorCavasObject(sensor Component) fyne.CanvasObject {
+func newLEDActuatorCanvasObject(component Component) fyne.CanvasObject {
+	val := component.Data.GetVal().(bool)
+
+	color_indication := canvas.NewRectangle(
+		// The color changes from black (if it is turned off) to yellow (if the LED is turned on)
+		func() color.Color {
+			// Light is turned on, so display yellow
+			if val {
+				return color.NRGBA{
+					R: 255,
+					G: 255,
+					B: 0,
+					A: 255,
+				}
+			} else {
+				return color.Black
+			}
+		}(),
+	)
+
+	text_inidication := func() *canvas.Text {
+		if val {
+			return canvas.NewText(
+				"LED IS ON",
+				color.Black,
+			)
+		} else {
+			return canvas.NewText(
+				"LED IS OFF",
+				color.White,
+			)
+		}
+	}()
+
+	button := func() *widget.Button {
+		if val {
+			return widget.NewButton(
+				"TURN LED OFF", // label
+				func() { UpdateActuatorValue(component.Id, false) }, // tapped
+			)
+		} else {
+			return widget.NewButton(
+				"TURN LED ON", // label
+				func() { UpdateActuatorValue(component.Id, true) }, //tapped
+			)
+		}
+	}()
+
+	led_co := container.NewGridWithRows(
+		2, // rows
+		container.NewMax(
+			color_indication,
+			container.NewCenter(text_inidication),
+		),
+		container.NewMax(
+			button,
+		),
+	)
+
+	return led_co
+}
+
+func newLightSensorCavasObject(component Component) fyne.CanvasObject {
 
 	// Creates a rectangle with a yellow colour to display the light
 	color_indication := canvas.NewRectangle(
 		color.NRGBA{
-			R: sensor.Data.GetVal().(uint8),
-			G: sensor.Data.GetVal().(uint8),
+			R: component.Data.GetVal().(uint8),
+			G: component.Data.GetVal().(uint8),
 			B: 0,
 			A: 255,
 		},
@@ -245,22 +310,22 @@ func newLightSensorCavasObject(sensor Component) fyne.CanvasObject {
 
 	color_indication.SetMinSize(fyne.NewSize(1, 50))
 
-	sensor_value := canvas.NewText(
-		strconv.Itoa(int(sensor.Data.GetVal().(uint8))),
+	component_value := canvas.NewText(
+		strconv.Itoa(int(component.Data.GetVal().(uint8))),
 		color.White,
 	)
 
 	light_co := container.NewMax(
 		color_indication,
-		container.NewCenter(sensor_value),
+		container.NewCenter(component_value),
 	)
 
 	return light_co
 }
 
-func newDHT11SensorCanvasObject(sensor Component) fyne.CanvasObject {
+func newDHT11SensorCanvasObject(component Component) fyne.CanvasObject {
 
-	temperature := sensor.Data.GetVal().(DHT11SensorDataVal).Temperature
+	temperature := component.Data.GetVal().(DHT11SensorDataVal).Temperature
 
 	temperature_color_indication := canvas.NewRectangle(
 		// The color changes from red (if it is above 25) or blue (below 25) to show hot and cold.
@@ -296,7 +361,7 @@ func newDHT11SensorCanvasObject(sensor Component) fyne.CanvasObject {
 		color.White,
 	)
 
-	humidity := sensor.Data.GetVal().(DHT11SensorDataVal).Humidity
+	humidity := component.Data.GetVal().(DHT11SensorDataVal).Humidity
 
 	// Just a standard thingy...
 	humidity_color_indication := canvas.NewRectangle(
@@ -328,9 +393,9 @@ func newDHT11SensorCanvasObject(sensor Component) fyne.CanvasObject {
 	return dht11_co
 }
 
-func newMotionSensorCanvasObject(sensor Component) fyne.CanvasObject {
+func newMotionSensorCanvasObject(component Component) fyne.CanvasObject {
 
-	movement := sensor.Data.GetVal().(bool)
+	movement := component.Data.GetVal().(bool)
 
 	color_indication := canvas.NewRectangle(
 		// Displays green if there is no movement and red if there is movement
@@ -382,16 +447,16 @@ func (b *ContextMenuButton) Tapped(e *fyne.PointEvent) {
 	widget.ShowPopUpMenuAtPosition(b.menu, fyne.CurrentApp().Driver().CanvasForObject(b), e.AbsolutePosition)
 }
 
-func newFinalSensorCanvasObject(sensor Component, sensor_co fyne.CanvasObject, menu fyne.Menu) fyne.CanvasObject {
+func newFinalSensorCanvasObject(component Component, component_co fyne.CanvasObject, menu fyne.Menu) fyne.CanvasObject {
 
-	sensor_type_name := sensor.Type.GetName()
+	component_type_name := component.Type.GetName()
 
 	final_co := container.NewMax(
 		container.NewBorder(
 			container.NewMax(
 				container.NewBorder(
 					nil, nil,
-					widget.NewLabel(sensor.Name+" ("+sensor_type_name+")"),
+					widget.NewLabel(component.Name+" ("+component_type_name+")"),
 					&ContextMenuButton{
 						Button: *widget.NewButtonWithIcon(
 							"", theme.MenuIcon(), func() {}),
@@ -400,7 +465,7 @@ func newFinalSensorCanvasObject(sensor Component, sensor_co fyne.CanvasObject, m
 				),
 			),
 			nil, nil, nil,
-			sensor_co,
+			component_co,
 		),
 	)
 

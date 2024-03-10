@@ -21,8 +21,10 @@ const (
 	MOTION_SENSOR = 3
 )
 
-func (st ComponentType) GetName() string {
-	switch st {
+func (ct ComponentType) GetName() string {
+	switch ct {
+	case LED_ACTUATOR:
+		return "LED"
 	case LIGHT_SENSOR:
 		return "Light"
 	case DHT11_SENSOR:
@@ -34,7 +36,7 @@ func (st ComponentType) GetName() string {
 	}
 }
 
-// LightSensorData | TemperatureSensorData | HumiditySensorData | MotionSensorData
+// LEDActuatorData | LightSensorData | TemperatureSensorData | HumiditySensorData | MotionSensorData
 type ComponentData interface {
 	GetVal() interface{}
 	SetVal(Val interface{})
@@ -97,31 +99,31 @@ func (m *MotionSensorData) SetVal(Val interface{}) {
 
 type House map[string][]Component
 
-func PopulateHouseWithSensors(house *House, sensors []Component) {
-	var sensor Component
-	for i := 0; i < len(sensors); i++ {
-		sensor = sensors[i]
+func PopulateHouseWithComponents(house *House, components []Component) {
+	var component Component
+	for i := 0; i < len(components); i++ {
+		component = components[i]
 
-		sensors_in_room, room_exists := (*house)[sensor.Room]
+		components_in_room, room_exists := (*house)[component.Room]
 
 		if !room_exists {
-			(*house)[sensor.Room] = []Component{sensor}
+			(*house)[component.Room] = []Component{component}
 			continue
 		}
 
-		////house[sensor.Room] = append(sensors_in_room, sensor)
+		//// house[component.Room] = append(components_in_room, component)
 
-		sensor_is_in_room := false
-		for j := 0; j < len(sensors_in_room); j++ {
-			if sensors_in_room[j].Id == sensor.Id {
-				sensors_in_room[j].Name = sensor.Name
-				sensors_in_room[j].Data.SetVal(sensor.Data.GetVal())
-				sensor_is_in_room = true
+		component_is_in_room := false
+		for j := 0; j < len(components_in_room); j++ {
+			if components_in_room[j].Id == component.Id {
+				components_in_room[j].Name = component.Name
+				components_in_room[j].Data.SetVal(component.Data.GetVal())
+				component_is_in_room = true
 			}
 		}
 
-		if !sensor_is_in_room {
-			(*house)[sensor.Room] = append((*house)[sensor.Room], sensor)
+		if !component_is_in_room {
+			(*house)[component.Room] = append((*house)[component.Room], component)
 		}
 
 	}
@@ -137,13 +139,15 @@ func (house House) GetRooms() []string {
 	return rooms
 }
 
-// The JsonSensor is used for parsing the json recieved from the server
+// ************************ REQUESTS LOGIC ************************
+
+// The JsonComponent is used for parsing the json recieved from the server.
 // It is very similar to the Sensor struct and the only reason why it exists is because
-// of the Data and Val attributes, as they are different for each of the sensor types
-// The server also has all of the attributes in lower case and instead of changing the
-// API based on the product (Go only exports fields with capital letters, but python
-// doesn't care about the capital letters), I decided to use the struct tags
-type JsonSensor struct {
+// of the Data and Val attributes, as they are different for each of the component
+// types. The server also has all of the attributes in lower case and instead of
+// changing the API based on the frontend (Go only exports fields with capital letters,
+// but python doesn't care about the capital letters), I decided to use the struct tags
+type JsonComponent struct {
 	Id   uint64        `json:"id"`
 	Name string        `json:"name"`
 	Room string        `json:"room"`
@@ -151,8 +155,44 @@ type JsonSensor struct {
 	Val  interface{}   `json:"val"`
 }
 
-func UpdateSensorValues(sensors *[]Component) {
-	resp, err := http.Get(SERVER_URL + "/get_all")
+func (json_component JsonComponent) ToComponent() Component {
+	return Component{
+		Id:   json_component.Id,
+		Name: json_component.Name,
+		Room: json_component.Room,
+		Type: json_component.Type,
+		Data: func() ComponentData {
+			switch json_component.Type {
+			case LED_ACTUATOR:
+				return &LEDActuatorData{
+					Val: json_component.Val.(bool),
+				}
+			case LIGHT_SENSOR:
+				return &LightSensorData{
+					// The json library casts every numeric item to a float64 apparently
+					Val: uint8(json_component.Val.(float64)),
+				}
+			case DHT11_SENSOR:
+				return &DHT11SensorData{
+					Val: DHT11SensorDataVal{
+						// The json library also casts arrays to []interface{} also...
+						Temperature: float32(json_component.Val.([]interface{})[0].(float64)),
+						Humidity:    float32(json_component.Val.([]interface{})[1].(float64)),
+					},
+				}
+			case MOTION_SENSOR:
+				return &MotionSensorData{
+					Val: json_component.Val.(bool),
+				}
+			default:
+				panic("Unknown component type")
+			}
+		}(),
+	}
+}
+
+func GetComponents(components *[]Component) {
+	resp, err := http.Get(SERVER_URL + "/get_components")
 	if err != nil {
 		fmt.Printf("Get Request Error: %v\n", err)
 	}
@@ -164,71 +204,61 @@ func UpdateSensorValues(sensors *[]Component) {
 		fmt.Printf("Reading Response Error: %v\n", err)
 	}
 
-	var sensors_json []JsonSensor
+	var components_json []JsonComponent
 
-	err = json.Unmarshal(body, &sensors_json)
+	err = json.Unmarshal(body, &components_json)
 	if err != nil {
 		fmt.Printf("Json Unmarshaling Error: %v\n", err)
 		fmt.Printf("body: %v\n", string(body))
 	}
 
-	for i, json_sensor := range sensors_json {
-		if i == len(*sensors) {
-			*sensors = append(*sensors, jsonSensorToSensor(json_sensor))
+	for i, json_component := range components_json {
+		if i == len(*components) {
+			*components = append(*components, json_component.ToComponent())
 			continue
 		}
 
-		sensor := &(*sensors)[i]
+		component := &(*components)[i]
 
-		// A sensor's id will never change, even though it's name may.
-		// A sensor's type will also never change.
-		// If a sensor does not have same id as json_sensor's id, it must have been deleted.
-		if sensor.Id != json_sensor.Id {
-			// Removes the sensor by creating a new slice without it
-			*sensors = append((*sensors)[:i], (*sensors)[i+1:]...)
+		// If a component does not have same id as json_component's id, it must have been deleted
+		// ! However this logic is not the best and requires the components to only be added at the end !
+		// TODO: Change this to make it better, or more logically sound (maybe it is but I confused myself?)
+		if component.Id != json_component.Id {
+			// Removes the component by creating a new slice without it
+			*components = append((*components)[:i], (*components)[i+1:]...)
 			continue
 		}
 
-		// It is possible for a sensor's name, room and value to change
-		sensor.Name = json_sensor.Name
-		sensor.Room = json_sensor.Room
-		sensor.Data.SetVal(jsonSensorToSensor(json_sensor).Data.GetVal())
+		// It is possible for a component's name, room and value to change, so this will track any changes
+		component.Name = json_component.Name
+		component.Room = json_component.Room
+		component.Data.SetVal(json_component.ToComponent().Data.GetVal())
 	}
 }
 
-func jsonSensorToSensor(json_sensor JsonSensor) Component {
-	return Component{
-		Id:   json_sensor.Id,
-		Name: json_sensor.Name,
-		Room: json_sensor.Room,
-		Type: json_sensor.Type,
-		Data: func() ComponentData {
-			switch json_sensor.Type {
-			case LED_ACTUATOR:
-				return &LEDActuatorData{
-					Val: json_sensor.Val.(bool),
-				}
-			case LIGHT_SENSOR:
-				return &LightSensorData{
-					// The json library casts every numeric item to a float64 apparently
-					Val: uint8(json_sensor.Val.(float64)),
-				}
-			case DHT11_SENSOR:
-				return &DHT11SensorData{
-					Val: DHT11SensorDataVal{
-						// The json library also casts arrays to []interface{} also...
-						Temperature: float32(json_sensor.Val.([]interface{})[0].(float64)),
-						Humidity:    float32(json_sensor.Val.([]interface{})[1].(float64)),
-					},
-				}
-			case MOTION_SENSOR:
-				return &MotionSensorData{
-					Val: json_sensor.Val.(bool),
-				}
-			default:
-				panic("Unknown sensor type")
-			}
-		}(),
+type UpdateActuatorValueBody struct {
+	Id  uint64      `json:"id"`
+	Val interface{} `json:"val"`
+}
+
+func UpdateActuatorValue(component_id uint64, new_val interface{}) {
+	body, err := json.Marshal(
+		UpdateActuatorValueBody{
+			Id:  component_id,
+			Val: new_val,
+		},
+	)
+	if err != nil {
+		fmt.Printf("JSON Marshalling Error: %v\n", err)
+	}
+
+	_, err = http.Post(
+		SERVER_URL+"/update_actuator_value",
+		"application/json",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		fmt.Printf("Post Request Error %v\n", err)
 	}
 }
 
@@ -238,10 +268,10 @@ type RenameSensorBody struct {
 	Room string `json:"room"`
 }
 
-func RenameSensor(sensor_id uint64, new_name string, new_room_name string) {
+func RenameSensor(component_id uint64, new_name string, new_room_name string) {
 	body, err := json.Marshal(
 		RenameSensorBody{
-			Id:   sensor_id,
+			Id:   component_id,
 			Name: new_name,
 			Room: new_room_name,
 		},
