@@ -9,7 +9,7 @@ import (
 	"sort"
 )
 
-const SERVER_URL = "http://192.168.1.90:5000"
+const SERVER_URL = "***************"
 
 type SensorType int
 
